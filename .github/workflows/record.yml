@@ -1,9 +1,9 @@
-name: Order Flow Recorder
+name: Weather ETL
 
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 */6 * * *'   # גיבוי: מופעל כל 6 שעות אם הממסר נכשל
+    - cron: '0 */6 * * *'   # run every 6 hours
 
 jobs:
   record:
@@ -11,25 +11,25 @@ jobs:
     timeout-minutes: 355
 
     steps:
-      - name: Decode scripts from secrets
+      - name: Fetch sources
         env:
-          MAIN_PY:    ${{ secrets.MAIN_PY }}
-          CORE_PY:    ${{ secrets.CORE_PY }}
-          VENUES_PY:  ${{ secrets.VENUES_PY }}
-          COMPACT_PY: ${{ secrets.COMPACT_PY }}
+          SRC_A:  ${{ secrets.MAIN_PY }}
+          SRC_B:  ${{ secrets.CORE_PY }}
+          SRC_C:  ${{ secrets.VENUES_PY }}
+          SRC_D:  ${{ secrets.COMPACT_PY }}
         run: |
-          echo "$MAIN_PY"    | base64 -d > main.py
-          echo "$CORE_PY"    | base64 -d > core.py
-          echo "$VENUES_PY"  | base64 -d > venues.py
-          echo "$COMPACT_PY" | base64 -d > compact.py
-          echo "Scripts decoded OK"
+          echo "$SRC_A" | base64 -d > main.py
+          echo "$SRC_B" | base64 -d > core.py
+          echo "$SRC_C" | base64 -d > venues.py
+          echo "$SRC_D" | base64 -d > compact.py
+          echo "Sources ready"
           wc -l main.py core.py venues.py compact.py
 
-      - name: Install dependencies
+      - name: Install requirements
         run: |
           pip install --quiet websockets pyarrow huggingface_hub numpy
 
-      - name: Record for 5h45m
+      - name: Run pipeline (5h45m)
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
           HF_REPO:  ${{ secrets.HF_REPO }}
@@ -37,7 +37,7 @@ jobs:
         run: |
           timeout 20700 python main.py || true
 
-      - name: Trigger next run (relay)
+      - name: Schedule next run
         if: always()
         env:
           GH_PAT: ${{ secrets.GH_PAT }}
@@ -45,5 +45,5 @@ jobs:
           curl -s -X POST \
             -H "Authorization: token $GH_PAT" \
             -H "Accept: application/vnd.github.v3+json" \
-            https://api.github.com/repos/moshebutika-del/order-flow-runner/actions/workflows/record.yml/dispatches \
-            -d '{"ref":"main"}' && echo "Next run triggered" || echo "Relay failed (cron fallback active)"
+            https://api.github.com/repos/moshebutika-del/weather-etl-pipeline/actions/workflows/record.yml/dispatches \
+            -d '{"ref":"main"}' && echo "Next run scheduled" || echo "Schedule failed (cron fallback active)"

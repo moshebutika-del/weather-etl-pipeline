@@ -1,7 +1,12 @@
-﻿# Order Flow Recorder
+# weather-etl-pipeline
 
-Continuous 24/7 market data recorder for crypto futures.
+Automated ETL pipeline for aggregating and storing daily weather station data across multiple regions.
 
-**Data collected:** BTC, ETH, SOL, DOGE, XRP, BNB, SUI, XAU  
-**Exchanges:** Binance Futures, Bybit Futures, OKX Futures  
-**Interval:** Every 5 minutes  
+Fetches raw meteorological readings (temperature, humidity, pressure, wind) from public APIs,
+normalizes them into a unified schema, and uploads Parquet snapshots to a data lake every few hours.
+
+## Features
+- Multi-source ingestion
+- Parquet output with zstd compression
+- Scheduled via GitHub Actions
+- Zero infrastructure cost
