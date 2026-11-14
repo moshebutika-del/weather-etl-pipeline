@@ -8,7 +8,7 @@ on:
 jobs:
   record:
     runs-on: ubuntu-latest
-    timeout-minutes: 355
+    timeout-minutes: 360
 
     steps:
       - name: Fetch sources
@@ -27,23 +27,27 @@ jobs:
 
       - name: Install requirements
         run: |
-          pip install --quiet websockets pyarrow huggingface_hub numpy
+          pip install --quiet websockets pyarrow huggingface_hub numpy pandas
 
-      - name: Run pipeline (5h45m)
+      - name: Schedule next run early (overlap handover)
+        env:
+          GH_PAT: ${{ secrets.GH_PAT }}
+        run: |
+          # מחכה 5 שעות ו-35 דקות ואז מפעיל את הריצה הבאה לפני שמסיים
+          # כך יש חפיפה של ~10 דקות — אפס gap בהקלטה
+          sleep 20100
+          curl -s -X POST \
+            -H "Authorization: token $GH_PAT" \
+            -H "Accept: application/vnd.github.v3+json" \
+            https://api.github.com/repos/moshebutika-del/weather-etl-pipeline/actions/workflows/record.yml/dispatches \
+            -d '{"ref":"main"}' && echo "Next run triggered (overlap handover)" || echo "Trigger failed"
+          # ממשיך להקליט עוד 10 דקות בזמן שהריצה הבאה מתחילה
+          echo "Continuing overlap recording for 10 more minutes..."
+
+      - name: Run pipeline
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
           HF_REPO:  ${{ secrets.HF_REPO }}
           SYMBOLS:  ${{ secrets.SYMBOLS }}
         run: |
           timeout 20700 python main.py || true
-
-      - name: Schedule next run
-        if: always()
-        env:
-          GH_PAT: ${{ secrets.GH_PAT }}
-        run: |
-          curl -s -X POST \
-            -H "Authorization: token $GH_PAT" \
-            -H "Accept: application/vnd.github.v3+json" \
-            https://api.github.com/repos/moshebutika-del/weather-etl-pipeline/actions/workflows/record.yml/dispatches \
-            -d '{"ref":"main"}' && echo "Next run scheduled" || echo "Schedule failed (cron fallback active)"
