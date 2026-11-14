@@ -3,7 +3,7 @@ name: Weather ETL
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 */6 * * *'   # run every 6 hours
+    - cron: '0 */6 * * *'   # fallback every 6 hours
 
 jobs:
   record:
@@ -13,41 +13,39 @@ jobs:
     steps:
       - name: Fetch sources
         env:
-          SRC_A:  ${{ secrets.MAIN_PY }}
-          SRC_B:  ${{ secrets.CORE_PY }}
-          SRC_C:  ${{ secrets.VENUES_PY }}
-          SRC_D:  ${{ secrets.COMPACT_PY }}
+          SRC_A: ${{ secrets.MAIN_PY }}
+          SRC_B: ${{ secrets.CORE_PY }}
+          SRC_C: ${{ secrets.VENUES_PY }}
+          SRC_D: ${{ secrets.COMPACT_PY }}
         run: |
           echo "$SRC_A" | base64 -d > main.py
           echo "$SRC_B" | base64 -d > core.py
           echo "$SRC_C" | base64 -d > venues.py
           echo "$SRC_D" | base64 -d > compact.py
-          echo "Sources ready"
           wc -l main.py core.py venues.py compact.py
 
       - name: Install requirements
-        run: |
-          pip install --quiet websockets pyarrow huggingface_hub numpy pandas
+        run: pip install --quiet websockets pyarrow huggingface_hub numpy pandas
 
-      - name: Schedule next run early (overlap handover)
+      - name: Run with overlap handover
         env:
-          GH_PAT: ${{ secrets.GH_PAT }}
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_REPO:  ${{ secrets.HF_REPO }}
+          SYMBOLS:  ${{ secrets.SYMBOLS }}
+          GH_PAT:   ${{ secrets.GH_PAT }}
         run: |
-          # מחכה 5 שעות ו-35 דקות ואז מפעיל את הריצה הבאה לפני שמסיים
-          # כך יש חפיפה של ~10 דקות — אפס gap בהקלטה
+          # מריץ את ההקלטה ברקע
+          timeout 20700 python main.py &
+          MAIN_PID=$!
+
+          # מחכה 5 שעות ו-35 דקות ואז מפעיל את הריצה הבאה
           sleep 20100
           curl -s -X POST \
             -H "Authorization: token $GH_PAT" \
             -H "Accept: application/vnd.github.v3+json" \
             https://api.github.com/repos/moshebutika-del/weather-etl-pipeline/actions/workflows/record.yml/dispatches \
-            -d '{"ref":"main"}' && echo "Next run triggered (overlap handover)" || echo "Trigger failed"
-          # ממשיך להקליט עוד 10 דקות בזמן שהריצה הבאה מתחילה
-          echo "Continuing overlap recording for 10 more minutes..."
+            -d '{"ref":"main"}' && echo "Next run triggered (overlap)" || echo "Trigger failed"
 
-      - name: Run pipeline
-        env:
-          HF_TOKEN: ${{ secrets.HF_TOKEN }}
-          HF_REPO:  ${{ secrets.HF_REPO }}
-          SYMBOLS:  ${{ secrets.SYMBOLS }}
-        run: |
-          timeout 20700 python main.py || true
+          # ממתין שה-python יסיים את ה-10 דקות הנותרות
+          wait $MAIN_PID || true
+          echo "Recording complete"
