@@ -1,0 +1,31 @@
+name: Daily Rollup
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '30 0 * * *'   # Runs every day at 00:30 UTC (after previous day completes)
+
+jobs:
+  compact:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+
+    steps:
+      - name: Fetch sources
+        env:
+          SRC_B: ${{ secrets.CORE_PY }}
+          SRC_D: ${{ secrets.COMPACT_PY }}
+        run: |
+          echo "$SRC_B" | base64 -d > core.py
+          echo "$SRC_D" | base64 -d > compact.py
+          wc -l core.py compact.py
+
+      - name: Install requirements
+        run: pip install --quiet pyarrow huggingface_hub numpy pandas
+
+      - name: Run daily compact and deduplication
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_REPO:  ${{ secrets.HF_REPO }}
+        run: |
+          python compact.py
