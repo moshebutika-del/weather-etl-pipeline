@@ -17,11 +17,15 @@ jobs:
           SRC_B: ${{ secrets.CORE_PY }}
           SRC_C: ${{ secrets.VENUES_PY }}
           SRC_D: ${{ secrets.COMPACT_PY }}
+          SRC_E: ${{ secrets.PAPER_BOT_PY }}
         run: |
           echo "$SRC_A" | base64 -d > main.py
           echo "$SRC_B" | base64 -d > core.py
           echo "$SRC_C" | base64 -d > venues.py
           echo "$SRC_D" | base64 -d > compact.py
+          if [ -n "$SRC_E" ]; then
+            echo "$SRC_E" | base64 -d > paper_bot.py
+          fi
           wc -l main.py core.py venues.py compact.py
 
       - name: Install requirements
