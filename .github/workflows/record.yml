@@ -5,6 +5,10 @@ on:
   schedule:
     - cron: '0 */6 * * *'   # fallback every 6 hours
 
+concurrency:
+  group: order-flow-recording
+  cancel-in-progress: false   # never kill running recorder; queue at most 1 pending
+
 jobs:
   record:
     runs-on: ubuntu-latest
@@ -38,11 +42,9 @@ jobs:
           SYMBOLS:  ${{ secrets.SYMBOLS }}
           GH_PAT:   ${{ secrets.GH_PAT }}
         run: |
-          # מריץ את ההקלטה ברקע
           timeout 20700 python main.py &
           MAIN_PID=$!
 
-          # מחכה 5 שעות ו-35 דקות ואז מפעיל את הריצה הבאה
           sleep 20100
           curl -s -X POST \
             -H "Authorization: token $GH_PAT" \
@@ -50,6 +52,5 @@ jobs:
             https://api.github.com/repos/moshebutika-del/weather-etl-pipeline/actions/workflows/record.yml/dispatches \
             -d '{"ref":"main"}' && echo "Next run triggered (overlap)" || echo "Trigger failed"
 
-          # ממתין שה-python יסיים את ה-10 דקות הנותרות
           wait $MAIN_PID || true
           echo "Recording complete"
