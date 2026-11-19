@@ -11,6 +11,14 @@ jobs:
     timeout-minutes: 180
 
     steps:
+      - name: Expand memory with swap
+        run: |
+          sudo fallocate -l 10G /swapfile
+          sudo chmod 600 /swapfile
+          sudo mkswap /swapfile
+          sudo swapon /swapfile
+          free -h
+
       - name: Fetch sources
         env:
           SRC_B: ${{ secrets.CORE_PY }}
