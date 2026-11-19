@@ -13,7 +13,9 @@ jobs:
     steps:
       - name: Expand memory with swap
         run: |
-          sudo fallocate -l 10G /swapfile
+          sudo swapoff -a || true
+          sudo rm -f /swapfile
+          sudo fallocate -l 12G /swapfile
           sudo chmod 600 /swapfile
           sudo mkswap /swapfile
           sudo swapon /swapfile
